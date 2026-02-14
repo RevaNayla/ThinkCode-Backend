@@ -11,7 +11,7 @@ const RoomTaskProgress = sequelize.define('RoomTaskProgress', {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'DiscussionRooms',
+      model: 'discussion_rooms',
       key: 'id',
     },
   },
