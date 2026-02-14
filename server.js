@@ -13,11 +13,18 @@ require("./models/UserMateriProgress");
 require("./models/DiscussionRoom");
 require("./models/DiscussionMessage");
 require("./models/Badge");
-require("./models/UserMateriProgress");
 require("./models/Workspace");
 require("./models/WorkspaceAttempt");
 require("./models/RoomTaskProgress");
-
+require("./models/Submission");
+require("./models/Clue");
+require("./models/GameLevel");
+require("./models/GameQuestion");
+require("./models/RoomMember");
+require("./models/TeacherFeedback");
+require("./models/DisscusionClueLog");
+require("./models/UserBadge");
+require("./models/UserProgress");
 
 
 console.log("JWT SECRET:", process.env.JWT_SECRET);
