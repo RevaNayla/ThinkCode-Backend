@@ -22,7 +22,7 @@ require("./models/GameLevel");
 require("./models/GameQuestion");
 require("./models/RoomMember");
 require("./models/TeacherFeedback");
-require("./models/DisscusionClueLog");
+require("./models/DiscussionClueLog");
 require("./models/UserBadge");
 require("./models/UserProgress");
 
