@@ -11,7 +11,7 @@ const Workspace = sequelize.define('Workspace', {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'DiscussionRoom',
+      model: 'discussion_rooms',
       key: 'id',
     },
   },
