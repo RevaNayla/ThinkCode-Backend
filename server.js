@@ -21,6 +21,11 @@ require("./models/RoomTaskProgress");
 
 
 console.log("JWT SECRET:", process.env.JWT_SECRET);
+// Import semua model
+const models = require("./models"); 
+
+// Import routes
+const dashboardRoutes = require("./routes/dashboardRoutes");
 
 
 const models = require("./models"); 
@@ -97,24 +102,27 @@ const videoRoutes = require("./routes/videoRoutes");
 app.use("/api/video", videoRoutes);
 
 
-
 const PORT = process.env.PORT || 5000;
+
+// Health check
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
     message: "ThinkCode Backend is running 🚀"
   });
 });
+
 app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
+// ====== START SERVER + SYNC DATABASE ====== //
 const startServer = async () => {
   try {
     await sequelize.authenticate();
     console.log("✅ Database connected");
 
-    // 1️⃣ sync model parent dulu (tidak tergantung FK)
+    // 1️⃣ Sync tabel parent dulu (tidak tergantung FK)
     await models.User.sync({ alter: true });
     await models.Materi.sync({ alter: true });
     await models.DiscussionRoom.sync({ alter: true });
@@ -122,13 +130,13 @@ const startServer = async () => {
     await models.Badge.sync({ alter: true });
     await models.Workspace.sync({ alter: true });
 
-    // 2️⃣ sync model yang tergantung FK
+    // 2️⃣ Sync tabel yang tergantung FK
     await models.UserMateriProgress.sync({ alter: true });
     await models.DiscussionMessage.sync({ alter: true });
     await models.WorkspaceAttempt.sync({ alter: true });
     await models.RoomTaskProgress.sync({ alter: true });
 
-    // start server setelah semua tabel siap
+    // Start server setelah semua tabel siap
     server.listen(PORT, "0.0.0.0", () => {
       console.log(`Server running on port ${PORT}`);
     });

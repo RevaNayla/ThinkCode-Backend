@@ -14,6 +14,9 @@ const UserBadge = require("./UserBadge");
 const Clue = require("./Clue");
 const DiscussionClueLog = require("./DiscussionClueLog");
 const RoomMember = require("./RoomMember");
+const Workspace = require("./Workspace");
+const WorkspaceAttempt = require("./WorkspaceAttempt");
+const RoomTaskProgress = require("./RoomTaskProgress");
 
 MateriSection.belongsTo(Materi, { foreignKey: "materiId" });
 DiscussionRoom.belongsTo(Materi, { foreignKey: "materiId" });
@@ -85,17 +88,18 @@ module.exports = {
   DiscussionRoom,
   DiscussionMessage,
   Upload,
-  UserMateriProgress,
-  Materi,
-
   LeaderboardIndividu,
   LeaderboardKelompok,
-
   Badge,
   UserBadge,
   Clue,
   GameLevel,
   GameQuestion,
+  DiscussionClueLog,
+  RoomMember,
+  Workspace,
+  WorkspaceAttempt,
+  RoomTaskProgress
 };
 
 
