@@ -26,12 +26,6 @@ console.log("JWT SECRET:", process.env.JWT_SECRET);
 const models = require("./models"); 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "http://localhost:5173", methods: ["GET","POST"] } });
-app.use((req, res, next) => {
-  req.io = io;
-  next();
-});
-app.set('io', io);
 
 app.use(cors());
 app.use(express.json());
@@ -48,10 +42,8 @@ app.use("/api/game", require("./routes/gameRoutes"));
 app.use("/api/discussion", require("./routes/discussionRoutes"));
 app.use("/api/upload", require("./routes/uploadRoutes"));
 app.use("/api/dashboard", dashboardRoutes);
-app.use("/api/achievement", require("./routes/achievementRoutes")); 
 app.use("/api/badges", require("./routes/badgeRoutes")); 
 app.use("/api/profile", require("./routes/profileRoutes"));
-app.use('/api/discussion', require('./routes/discussionRoutes'));
 
 
 
