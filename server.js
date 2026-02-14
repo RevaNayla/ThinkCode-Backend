@@ -116,19 +116,17 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log("✅ Database connected");
 
-    // 1️⃣ Sync tabel parent dulu (tidak tergantung FK)
-    await models.User.sync({ alter: true });
-    await models.Materi.sync({ alter: true });
-    await models.DiscussionRoom.sync({ alter: true });
-    await models.MateriSection.sync({ alter: true });
-    await models.Badge.sync({ alter: true });
-    await models.Workspace.sync({ alter: true });
+// parent tables dulu
+await models.User.sync({ alter: true });
+await models.Materi.sync({ alter: true });
+await models.DiscussionRoom.sync({ alter: true });
 
-    // 2️⃣ Sync tabel yang tergantung FK
-    await models.UserMateriProgress.sync({ alter: true });
-    await models.DiscussionMessage.sync({ alter: true });
-    await models.WorkspaceAttempt.sync({ alter: true });
-    await models.RoomTaskProgress.sync({ alter: true });
+// baru yang tergantung FK
+await models.Workspace.sync({ alter: true });
+await models.UserMateriProgress.sync({ alter: true });
+await models.DiscussionMessage.sync({ alter: true });
+await models.WorkspaceAttempt.sync({ alter: true });
+await models.RoomTaskProgress.sync({ alter: true });
 
     // Start server setelah semua tabel siap
     server.listen(PORT, "0.0.0.0", () => {
