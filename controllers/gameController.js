@@ -116,10 +116,10 @@ if (scorePercent === 100 && level.Badge) {
     },
   });
 
-  badge = {
-    badge_name: level.Badge.badge_name,
-    image: `http://localhost:5000${level.Badge.image}`, 
-  };
+badge = {
+  badge_name: level.Badge.badge_name,
+  image: `${process.env.BASE_URL}${level.Badge.image}`,
+};
 }
 
 

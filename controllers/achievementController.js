@@ -16,7 +16,7 @@ exports.getUserAchievements = async (req, res) => {
       id: row.Badge.id,
       title: row.Badge.badge_name,
       description: row.Badge.description,
-      image: `http://localhost:5000${row.Badge.image}`,
+      image: `${process.env.BASE_URL}${row.Badge.image}`,
     }));
 
     console.log("ACHIEVEMENT RESULT:", result);
