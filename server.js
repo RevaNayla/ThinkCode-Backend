@@ -109,18 +109,33 @@ app.get("/health", (req, res) => {
   res.status(200).send("OK");
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await sequelize.authenticate();
+    console.log("✅ Database connected");
 
-sequelize.authenticate()
-  .then(() => {
-    console.log("Database connected");
-  })
-  .catch((err) => {
-    console.error("DB connection error:", err);
-  });
+    // 1️⃣ sync model parent dulu (tidak tergantung FK)
+    await models.User.sync({ alter: true });
+    await models.Materi.sync({ alter: true });
+    await models.DiscussionRoom.sync({ alter: true });
+    await models.MateriSection.sync({ alter: true });
+    await models.Badge.sync({ alter: true });
+    await models.Workspace.sync({ alter: true });
 
-sequelize.sync({ alter: true }) 
-  .then(() => console.log("All tables synced"))
-  .catch((err) => console.error("Error syncing tables:", err));
+    // 2️⃣ sync model yang tergantung FK
+    await models.UserMateriProgress.sync({ alter: true });
+    await models.DiscussionMessage.sync({ alter: true });
+    await models.WorkspaceAttempt.sync({ alter: true });
+    await models.RoomTaskProgress.sync({ alter: true });
+
+    // start server setelah semua tabel siap
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+
+  } catch (err) {
+    console.error("❌ Database or sync error:", err);
+  }
+};
+
+startServer();
