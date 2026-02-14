@@ -21,7 +21,7 @@ const UserMateriProgress = sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true,  
       references: {
-        model: 'DiscussionRoom',  
+        model: 'discussion_rooms',  
         key: 'id',
       },
     },
