@@ -121,3 +121,6 @@ sequelize.authenticate()
     console.error("DB connection error:", err);
   });
 
+sequelize.sync({ alter: true }) 
+  .then(() => console.log("All tables synced"))
+  .catch((err) => console.error("Error syncing tables:", err));
