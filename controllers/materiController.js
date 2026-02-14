@@ -1,7 +1,8 @@
 const Materi = require("../models/Materi");
 const MateriSection = require("../models/MateriSection");
 const UserMateriProgress = require("../models/UserMateriProgress");
-const STEPS = ["watch_video", "open_mini_lesson", "join_discussion", "send_chat", "submit_answer"];
+const STEPS = ["watch_video", "open_mini_lesson", "join_discussion", "submit_answer"];
+
 
 // GET ALL MATERI
 exports.getAllMateri = async (req, res) => {
@@ -134,11 +135,16 @@ exports.completeStep = async (req, res) => {
 
     let completedSteps = JSON.parse(progress.completedSections);
 
+    completedSteps = completedSteps.filter(s => STEPS.includes(s));
+
+
     if (!completedSteps.includes(step)) {
       completedSteps.push(step);
     }
 
-    const percent = Math.round((completedSteps.length / STEPS.length) * 100);
+    const percentRaw = Math.round((completedSteps.length / STEPS.length) * 100);
+    const percent = Math.min(percentRaw, 100);
+
 
     await progress.update({
       completedSections: JSON.stringify(completedSteps),

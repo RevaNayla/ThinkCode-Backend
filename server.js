@@ -3,7 +3,6 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const path = require("path");
-const { Server } = require("socket.io");
 const sequelize = require("./config/db");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 
@@ -15,6 +14,9 @@ require("./models/DiscussionRoom");
 require("./models/DiscussionMessage");
 require("./models/Badge");
 require("./models/UserMateriProgress");
+require("./models/Workspace");
+require("./models/WorkspaceAttempt");
+require("./models/RoomTaskProgress");
 
 
 
@@ -49,6 +51,7 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/achievement", require("./routes/achievementRoutes")); 
 app.use("/api/badges", require("./routes/badgeRoutes")); 
 app.use("/api/profile", require("./routes/profileRoutes"));
+app.use('/api/discussion', require('./routes/discussionRoutes'));
 
 
 
@@ -95,106 +98,6 @@ const videoRoutes = require("./routes/videoRoutes");
 app.use("/api/video", videoRoutes);
 
 
-
-
-
-// socket logic
-io.on("connection", (socket) => {
-  console.log("socket connected:", socket.id);
-
-  /* ================= JOIN ROOM ================= */
-  socket.on("joinRoom", async ({ roomId, userId }, cb) => {
-    try {
-      const room = await models.DiscussionRoom.findByPk(roomId);
-      if (!room) {
-        return cb && cb({ status: false, message: "Room tidak ditemukan" });
-      }
-
-      const roomKey = `room-${roomId}`; 
-      socket.join(roomKey);
-
-      cb && cb({ status: true });
-
-      console.log(`User ${userId} joined room-${roomId}`);  
-    } catch (err) {
-      console.error("joinRoom error:", err);
-      cb && cb({ status: false, message: "Server error" });
-    }
-  });
-
-  /* ================= LEAVE ROOM ================= */
-  socket.on("leaveRoom", ({ roomId, userId }) => {
-    socket.leave(`room-${roomId}`);  
-    console.log(`User ${userId} left room-${roomId}`);
-  });
-
-  /* ================= SEND MESSAGE ================= */
-  socket.on("sendMessage", async ({ roomId, userId, message }) => {
-    try {
-      if (!message || !message.trim()) return;
-
-      const msg = await models.DiscussionMessage.create({
-        roomId,
-        userId,
-        message,
-      });
-
-      const user = await models.User.findByPk(userId);
-
-      io.to(`room-${roomId}`).emit("newMessage", { 
-        id: msg.id,
-        roomId,
-        userId,
-        userName: user.name,
-        userInitial: user.name.charAt(0).toUpperCase(),
-        message: msg.message,
-        createdAt: msg.createdAt,
-      });
-
-      if (message === "[REQUEST_CLUE]") {
-  const [[{ used }]] = await sequelize.query(
-    `SELECT COUNT(*) AS used 
-     FROM discussion_messages 
-     WHERE roomId = ? AND message = '[REQUEST_CLUE]'`,
-    { replacements: [roomId] }
-  );
-
-  io.to(`room-${roomId}`).emit("clue_update", {
-    used,
-    max: 3
-  });
-}
-
-
-    } catch (err) {
-      console.error("sendMessage socket error:", err);
-    }
-    
-  });
-
-  socket.on("admin_request_clue", async ({ roomId }) => {
-  try {
-    const [[{ used }]] = await sequelize.query(
-      `SELECT COUNT(*) AS used 
-       FROM discussion_messages 
-       WHERE roomId = ? AND message = '[REQUEST_CLUE]'`,
-      { replacements: [roomId] }
-    );
-
-    socket.emit("clue_update", {
-      used,
-      max: 3
-    });
-
-  } catch (err) {
-    console.error("admin_request_clue error:", err);
-  }
-});
-
-  socket.on("disconnect", () => {
-    console.log("socket disconnected:", socket.id);
-  });
-});
 
 (async () => {
   try {

@@ -22,4 +22,23 @@ router.post(
   discussionController.useClue
 );
 
+// ================= WORKSPACE =================
+router.post("/workspace/pseudocode/:roomId/save", verifyToken, discussionController.savePseudocode);
+router.post("/workspace/flowchart/:roomId/save", verifyToken, discussionController.saveFlowchart);
+router.get("/workspace/:roomId", verifyToken, discussionController.getWorkspace);
+
+// ================= TASK =================
+router.get("/task/:roomId", verifyToken, discussionController.getTaskProgress);
+router.put("/task/:roomId/:taskId", verifyToken, discussionController.updateTask);
+router.get("/upload/:roomId/check", verifyToken, discussionController.checkAllTasksDone); // Untuk cek sebelum upload
+
+router.get(
+  "/room/:roomId/performance",
+  verifyToken,
+  discussionController.getRoomPerformance
+);
+
+// Tambahkan untuk XP (jika belum ada)
+router.get("/user-xp/:materiId", verifyToken, discussionController.getUserXp);
+
 module.exports = router;

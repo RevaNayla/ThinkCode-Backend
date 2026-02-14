@@ -1,6 +1,9 @@
 const db = require("../../models");
 const sequelize = db.sequelize || require("../../config/db");
 const MAX_CLUE = 3;
+const Workspace = require("../../models/Workspace");
+const WorkspaceAttempt = require("../../models/WorkspaceAttempt");
+const DiscussionClueLog = require("../../models/DiscussionClueLog");
 
 exports.listMateri = async (req, res) => {
   try {
@@ -100,24 +103,22 @@ exports.roomDetail = async (req, res) => {
       { replacements: [roomId], type: sequelize.QueryTypes.SELECT }
     );
 
-    const clueRows = await sequelize.query(
-      `SELECT COUNT(*) AS used FROM discussion_messages WHERE roomId = ? AND message = '[REQUEST_CLUE]'`,
-      { replacements: [roomId], type: sequelize.QueryTypes.SELECT }
-    );
-
-    const used = clueRows[0].used || 0;
+    // Perbaiki hitungan clue: gunakan DiscussionClueLog.count
+    const used = await DiscussionClueLog.count({ where: { roomId } });
+    console.log(`DEBUG: Clue used for room ${roomId}: ${used}`); // Tambah log untuk debug
+    const maxClue = 3; // Sesuaikan dengan siswa
 
     return res.json({
       status: true,
       data: {
         room,
         messages,
-        clue: { used, max: 5 }
+        clue: { used, max: maxClue }
       }
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("roomDetail error:", err);
     return res.status(500).json({ status: false, message: "Server error" });
   }
 };
@@ -207,5 +208,34 @@ exports.deleteRoom = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+exports.workspaceLatest = async (req, res) => {
+  try {
+    console.log("Fetching workspace for roomId:", req.params.roomId);
+    const workspace = await Workspace.findOne({
+      where: { roomId: req.params.roomId }
+    });
+    console.log("Workspace data found:", workspace);
+    return res.json({ status: true, data: workspace });
+  } catch (err) {
+    console.error("workspaceLatest error:", err);
+    return res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+exports.workspaceAttempts = async (req, res) => {
+  try {
+    console.log("Fetching attempts for roomId:", req.params.roomId);
+    const attempts = await WorkspaceAttempt.findAll({
+      where: { roomId: req.params.roomId },
+      order: [["type", "ASC"], ["attemptNumber", "ASC"]]
+    });
+    console.log("Attempts data found:", attempts.length, "items");
+    return res.json({ status: true, data: attempts });
+  } catch (err) {
+    console.error("workspaceAttempts error:", err);
+    return res.status(500).json({ status: false, message: "Server error" });
   }
 };

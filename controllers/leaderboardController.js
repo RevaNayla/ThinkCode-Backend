@@ -4,6 +4,9 @@ const DiscussionRoom = require("../models/DiscussionRoom");
 const RoomMember = require("../models/RoomMember");
 const UserMateriProgress = require("../models/UserMateriProgress");
 const User = require("../models/User");
+const DiscussionClueLog = require("../models/DiscussionClueLog");
+const WorkspaceAttempt = require("../models/WorkspaceAttempt");
+const RoomTaskProgress = require("../models/RoomTaskProgress");
 
 /* ================= INDIVIDUAL ================= */
 exports.getIndividualLeaderboard = async (req, res) => {
@@ -70,6 +73,36 @@ exports.getGroupLeaderboard = async (req, res) => {
         totalXp = Number(xpData[0]?.totalXp || 0);
       }
 
+        /* ===== ROOM PERFORMANCE ===== */
+
+        // clue used
+        const usedClues = await DiscussionClueLog.count({
+          where: { roomId: room.id }
+        });
+
+        // attempts
+        const attempts = await WorkspaceAttempt.count({
+          where: { roomId: room.id }
+        });
+
+        // tasks
+        const tasks = await RoomTaskProgress.findAll({
+          where: { roomId: room.id }
+        });
+
+        const allDone =
+          tasks.length === 5 &&
+          tasks.every(t => t.done);
+
+        let performanceScore = 100;
+
+        performanceScore -= usedClues * 10;
+        performanceScore -= attempts * 5;
+        if (!allDone) performanceScore -= 20;
+
+        if (performanceScore < 0) performanceScore = 0;
+
+
       /* ===== FINISH TIME ===== */
       const finish = await UserMateriProgress.findAll({
         where: { roomId: room.id, percent: 100 },
@@ -85,7 +118,8 @@ exports.getGroupLeaderboard = async (req, res) => {
         avgProgress,
         totalXp,
         finishTime,
-        speedBonus: 0
+        speedBonus: 0,
+        performanceScore
       });
     }
 
@@ -107,10 +141,11 @@ exports.getGroupLeaderboard = async (req, res) => {
 
       const normalizedXp = r.totalXp / maxXp;
 
-      const score =
-        (r.avgProgress * 0.5) +
-        (normalizedXp * 100 * 0.3) +
-        (r.speedBonus * 0.2);
+    const score =
+      (r.avgProgress * 0.4) +
+      (normalizedXp * 100 * 0.25) +
+      (r.speedBonus * 0.15) +
+      (r.performanceScore * 0.2);
 
       return {
         ...r,

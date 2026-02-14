@@ -6,6 +6,54 @@ const Clue = require("../models/Clue");
 const DiscussionClueLog = require("../models/DiscussionClueLog");
 const UserMateriProgress = require("../models/UserMateriProgress");
 const RoomMember = require("../models/RoomMember");
+const RoomTaskProgress = require("../models/RoomTaskProgress");
+const Workspace = require("../models/Workspace");
+const WorkspaceAttempt = require("../models/WorkspaceAttempt");
+
+exports.getRoomPerformance = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    // 1️⃣ Hitung clue used (pakai DiscussionClueLog)
+    const usedClues = await DiscussionClueLog.count({
+      where: { roomId }
+    });
+
+    // 2️⃣ Hitung total attempt (pseudocode + flowchart)
+    const attempts = await WorkspaceAttempt.count({
+      where: { roomId }
+    });
+
+    // 3️⃣ Cek apakah semua task selesai
+    const tasks = await RoomTaskProgress.findAll({
+      where: { roomId }
+    });
+
+    const allDone =
+      tasks.length === 5 &&
+      tasks.every(t => t.done);
+
+    // 4️⃣ Hitung score
+    let score = 100;
+
+    score -= usedClues * 10;
+    score -= attempts * 5;
+    if (!allDone) score -= 20;
+
+    if (score < 0) score = 0;
+
+    res.json({
+      score,
+      usedClues,
+      attempts,
+      allDone
+    });
+
+  } catch (error) {
+    console.error("Error getRoomPerformance:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
 
 /* ================= GET ROOMS ================= */
 exports.getRooms = async (req, res) => {
@@ -30,7 +78,7 @@ exports.getRooms = async (req, res) => {
         });
         return {
           ...room.toJSON(),
-          current, 
+          current,
         };
       })
     );
@@ -58,9 +106,9 @@ exports.getRoom = async (req, res) => {
       message: m.message,
       createdAt: m.createdAt,
       userId: m.userId,
-      userName: m.User?.name || "System",  
-      userInitial: m.User ? (m.User.name.charAt(0) || "U").toUpperCase() : "💡", 
-      type: m.type || "message", 
+      userName: m.User?.name || "System",
+      userInitial: m.User ? (m.User.name.charAt(0) || "U").toUpperCase() : "💡",
+      type: m.type || "message",
     }));
 
     res.json({ status: true, data: formatted });
@@ -87,7 +135,7 @@ exports.sendMessage = async (req, res) => {
       roomId,
       userId,
       message,
-      type: "message",  
+      type: "message",
     });
 
     const user = await User.findByPk(userId);
@@ -169,13 +217,13 @@ exports.getClues = async (req, res) => {
 
 /* ================= USE CLUE (GROUP XP) ================= */
 exports.useClue = async (req, res) => {
-  const transaction = await DiscussionMessage.sequelize.transaction(); 
+  const transaction = await DiscussionMessage.sequelize.transaction();
   try {
     const { roomId: roomIdStr, clueId: clueIdStr } = req.params;
     const roomId = parseInt(roomIdStr, 10);
     const clueId = parseInt(clueIdStr, 10);
     const userId = req.user.id;
-    const io = req.app.get("io");
+
 
     // ================= VALIDASI =================
     if (isNaN(roomId) || roomId <= 0)
@@ -256,16 +304,6 @@ exports.useClue = async (req, res) => {
       type: "clue",
       message: `💡 Clue: ${clue.clueText}`,
     }, { transaction });
-
-    // ================= SOCKET EMIT =================
-    if (io) {
-      const combinedClueText = `💡 Clue dibuka oleh ${user.name}. Clue: ${clue.clueText}`;
-      io.to(`room-${roomId}`).emit("clueUsed", {
-        id: `clue-${msg2.id}`,
-        clueText: combinedClueText,
-        createdAt: msg2.createdAt,
-      });
-    }
 
     await transaction.commit();
     return res.json({
@@ -363,7 +401,7 @@ exports.joinRoom = async (req, res) => {
   }
 };
 
-/* ================= CAN USE CLUE  ================= */
+/* ================= CAN USE CLUE ================= */
 exports.canUseClue = async (req, res) => {
   try {
     const { roomId, clueId } = req.params;
@@ -410,5 +448,231 @@ exports.getUserXp = async (req, res) => {
     res.json({ status: true, xp: progress?.xp || 0 });
   } catch (err) {
     res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+/* ================= SAVE PSEUDOCODE ================= */
+exports.savePseudocode = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { pseudocode } = req.body;
+
+    if (!pseudocode || !pseudocode.trim()) {
+      return res.status(400).json({
+        status: false,
+        message: "Pseudocode tidak boleh kosong",
+      });
+    }
+
+    const attemptCount = await WorkspaceAttempt.count({
+      where: { roomId, type: "pseudocode" },
+    });
+
+    if (attemptCount >= 10) {
+      return res.status(400).json({
+        status: false,
+        message: "Maksimal 10 attempt pseudocode tercapai.",
+      });
+    }
+
+    await WorkspaceAttempt.create({
+      roomId,
+      type: "pseudocode",
+      attemptNumber: attemptCount + 1,
+      content: pseudocode,
+    });
+
+    let workspace = await Workspace.findOne({ where: { roomId } });
+
+    if (workspace) {
+      await workspace.update({ pseudocode });
+    } else {
+      await Workspace.create({
+        roomId,
+        pseudocode,
+        flowchart: { conditions: [], elseInstruction: "" },
+      });
+    }
+
+    // AUTO CHECKLIST TASK 3
+    await RoomTaskProgress.upsert({
+      roomId,
+      taskId: 3,
+      done: true,
+    });
+
+    res.json({
+      status: true,
+      message: `Pseudocode disimpan (Attempt ${attemptCount + 1}/10)`,
+    });
+
+  } catch (err) {
+    console.error("savePseudocode:", err);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+/* ================= SAVE FLOWCHART ================= */
+exports.saveFlowchart = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const { flowchart } = req.body;
+
+    const attemptCount = await WorkspaceAttempt.count({
+      where: { roomId, type: "flowchart" },
+    });
+
+    if (attemptCount >= 10) {
+      return res.status(400).json({
+        status: false,
+        message: "Maksimal 10 attempt flowchart tercapai.",
+      });
+    }
+
+    await WorkspaceAttempt.create({
+      roomId,
+      type: "flowchart",
+      attemptNumber: attemptCount + 1,
+      content: JSON.stringify(flowchart),
+    });
+
+    let workspace = await Workspace.findOne({ where: { roomId } });
+
+    if (workspace) {
+      await workspace.update({ flowchart });
+    } else {
+      await Workspace.create({
+        roomId,
+        pseudocode: "",
+        flowchart,
+      });
+    }
+
+    // AUTO CHECKLIST TASK 4
+    await RoomTaskProgress.upsert({
+      roomId,
+      taskId: 4,
+      done: true,
+    });
+
+    res.json({
+      status: true,
+      message: `Flowchart disimpan (Attempt ${attemptCount + 1}/10)`,
+    });
+
+  } catch (err) {
+    console.error("saveFlowchart:", err);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+/* ================= GET WORKSPACE ================= */
+exports.getWorkspace = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const workspace = await Workspace.findOne({ where: { roomId } });
+    res.json({ status: true, data: workspace || { pseudocode: "", flowchart: { conditions: [], elseInstruction: "" } } });
+  } catch (err) {
+    console.error("getWorkspace:", err);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+/* ================= GET TASK PROGRESS ================= */
+exports.getTaskProgress = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const tasks = await RoomTaskProgress.findAll({ where: { roomId } });
+    const taskMap = {};
+    tasks.forEach(t => { taskMap[t.taskId] = t.done; });
+    // Default false jika belum ada
+    for (let i = 1; i <= 5; i++) {
+      if (!taskMap[i]) taskMap[i] = false;
+    }
+    res.json({ status: true, data: taskMap });
+  } catch (err) {
+    console.error("getTaskProgress:", err);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+/* ================= UPDATE TASK ================= */
+exports.updateTask = async (req, res) => {
+  try {
+    const { roomId, taskId } = req.params;
+    const { done } = req.body;
+
+    await RoomTaskProgress.upsert({
+      roomId,
+      taskId: parseInt(taskId),
+      done: !!done,
+    });
+
+    res.json({ status: true, message: "Task updated." });
+  } catch (err) {
+    console.error("updateTask:", err);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+/* ================= CHECK ALL TASKS DONE ================= */
+exports.checkAllTasksDone = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const tasks = await RoomTaskProgress.findAll({ where: { roomId } });
+    const allDone = tasks.length === 5 && tasks.every(t => t.done);
+    res.json({ status: true, allDone });
+  } catch (err) {
+    console.error("checkAllTasksDone:", err);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+/* ================= GET WORKSPACE ATTEMPTS (FOR ADMIN) ================= */
+exports.getWorkspaceAttempts = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const attempts = await WorkspaceAttempt.findAll({
+      where: { roomId },
+      order: [['createdAt', 'ASC']],
+    });
+    res.json({ status: true, data: attempts });
+  } catch (err) {
+    console.error("getWorkspaceAttempts:", err);
+    res.status(500).json({ status: false, message: "Server error" });
+  }
+};
+
+exports.uploadJawaban = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    const tasks = await RoomTaskProgress.findAll({
+      where: { roomId }
+    });
+
+    const allDone =
+      tasks.length === 5 &&
+      tasks.every(t => t.done);
+
+    if (!allDone) {
+      return res.status(400).json({
+        status: false,
+        message: "Selesaikan semua task sebelum upload jawaban."
+      });
+    }
+
+    // lanjut proses upload file di sini
+
+    res.json({
+      status: true,
+      message: "Upload berhasil."
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      status: false,
+      message: "Server error"
+    });
   }
 };

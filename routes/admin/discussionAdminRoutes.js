@@ -16,4 +16,9 @@ router.post("/rooms", verifyToken, isAdmin, ctrl.createRoom);
 router.put("/rooms/:id", verifyToken, isAdmin, ctrl.updateRoom);
 router.delete("/rooms/:id", verifyToken, isAdmin, ctrl.deleteRoom);
 
+router.get("/workspace/attempts/:roomId", verifyToken, isAdmin, ctrl.workspaceAttempts);
+router.get("/workspace/latest/:roomId", verifyToken, isAdmin, ctrl.workspaceLatest);
+
+
+
 module.exports = router;
