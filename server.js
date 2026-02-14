@@ -145,6 +145,7 @@ await models.UserProgress.sync({ alter: true });
 await models.UserBadge.sync({ alter: true });
 await models.TeacherFeedback.sync({ alter: true });
 await models.MateriSection.sync({ alter: true });
+await models.RoomMember.sync({ alter: true });
 
 
     // Start server setelah semua tabel siap

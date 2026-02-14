@@ -17,6 +17,9 @@ const RoomMember = require("./RoomMember");
 const Workspace = require("./Workspace");
 const WorkspaceAttempt = require("./WorkspaceAttempt");
 const RoomTaskProgress = require("./RoomTaskProgress");
+const Submission = require("./Submission");
+const UserProgress = require("./UserProgress");
+const TeacherFeedback = require("./TeacherFeedback");
 
 MateriSection.belongsTo(Materi, { foreignKey: "materiId" });
 DiscussionRoom.belongsTo(Materi, { foreignKey: "materiId" });
@@ -99,7 +102,10 @@ module.exports = {
   RoomMember,
   Workspace,
   WorkspaceAttempt,
-  RoomTaskProgress
+  RoomTaskProgress,
+  Submission,
+  UserProgress,
+  TeacherFeedback,
 };
 
 
