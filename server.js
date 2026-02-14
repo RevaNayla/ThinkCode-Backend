@@ -24,9 +24,6 @@ console.log("JWT SECRET:", process.env.JWT_SECRET);
 // Import semua model
 const models = require("./models"); 
 
-// Import routes
-const dashboardRoutes = require("./routes/dashboardRoutes");
-
 
 const models = require("./models"); 
 const app = express();
