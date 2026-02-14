@@ -92,6 +92,15 @@ app.use("/api/video", videoRoutes);
 
 
 const PORT = process.env.PORT || 5000;
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "success",
+    message: "ThinkCode Backend is running 🚀"
+  });
+});
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
