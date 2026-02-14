@@ -11,11 +11,11 @@ const WorkspaceAttempt = sequelize.define('WorkspaceAttempt', {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'DiscussionRooms',
+      model: 'discussion_rooms',
       key: 'id',
     },
   },
-  type: { // Baru: 'pseudocode' atau 'flowchart'
+  type: {
     type: DataTypes.ENUM('pseudocode', 'flowchart'),
     allowNull: false,
   },
@@ -23,7 +23,7 @@ const WorkspaceAttempt = sequelize.define('WorkspaceAttempt', {
     type: DataTypes.INTEGER,
     allowNull: false,
   },
-  content: { // Gabung pseudocode atau flowchart (JSON untuk flowchart)
+  content: {
     type: DataTypes.TEXT,
     allowNull: true,
   },
