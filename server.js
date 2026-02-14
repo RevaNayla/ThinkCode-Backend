@@ -38,8 +38,15 @@ app.use(cors({
     "http://localhost:5173",
     "https://think-code-alpha.vercel.app"
   ],
-  credentials: true
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],  
+  allowedHeaders: ["Content-Type", "Authorization"]  
 }));
+
+app.use((req, res, next) => {
+  console.log("CORS Debug - Origin:", req.headers.origin, "Method:", req.method);
+  next();
+});
 
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
