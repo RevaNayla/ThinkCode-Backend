@@ -21,9 +21,6 @@ require("./models/RoomTaskProgress");
 
 
 console.log("JWT SECRET:", process.env.JWT_SECRET);
-// Import semua model
-const models = require("./models"); 
-
 
 const models = require("./models"); 
 const app = express();
