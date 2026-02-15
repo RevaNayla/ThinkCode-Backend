@@ -38,6 +38,12 @@ router.get(
   discussionController.getRoomPerformance
 );
 
+router.get(
+  "/submission/status/:roomId",
+  verifyToken,
+  discussionController.getSubmissionStatus
+);
+
 // Tambahkan untuk XP (jika belum ada)
 router.get("/user-xp/:materiId", verifyToken, discussionController.getUserXp);
 
