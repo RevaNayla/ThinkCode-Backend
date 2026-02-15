@@ -10,6 +10,29 @@ const RoomTaskProgress = require("../models/RoomTaskProgress");
 const Workspace = require("../models/Workspace");
 const WorkspaceAttempt = require("../models/WorkspaceAttempt");
 
+exports.syncUserXp = async (userId, materiId, transaction = null) => {
+  const user = await User.findByPk(userId, { attributes: ['xp'], transaction });
+  if (!user) return;
+
+  let progress = await UserMateriProgress.findOne({
+    where: { userId, materiId },
+    transaction,
+  });
+
+  if (progress) {
+    await progress.update({ xp: user.xp }, { transaction });
+  } else {
+    progress = await UserMateriProgress.create({
+      userId,
+      materiId,
+      xp: user.xp,
+      completedSections: '[]',
+      percent: 0,
+    }, { transaction });
+  }
+  return progress;
+};
+
 exports.getRoomPerformance = async (req, res) => {
   try {
     const { roomId } = req.params;
@@ -224,81 +247,69 @@ exports.useClue = async (req, res) => {
     const clueId = parseInt(clueIdStr, 10);
     const userId = req.user.id;
 
+    // Validasi
+    if (isNaN(roomId) || roomId <= 0) return res.status(400).json({ message: "roomId tidak valid" });
+    if (isNaN(clueId) || clueId <= 0) return res.status(400).json({ message: "clueId tidak valid" });
 
-    // ================= VALIDASI =================
-    if (isNaN(roomId) || roomId <= 0)
-      return res.status(400).json({ message: "roomId tidak valid" });
-
-    if (isNaN(clueId) || clueId <= 0)
-      return res.status(400).json({ message: "clueId tidak valid" });
-
-    // ================= AMBIL USER =================
-    const user = await User.findByPk(userId, { transaction });
-    if (!user)
-      return res.status(404).json({ message: "User tidak ditemukan" });
-
-    // ================= AMBIL ROOM =================
+    // Ambil room
     const room = await DiscussionRoom.findByPk(roomId, { transaction });
-    if (!room)
-      return res.status(404).json({ message: "Room tidak ditemukan" });
+    if (!room) return res.status(404).json({ message: "Room tidak ditemukan" });
+    if (!room.materiId) return res.status(400).json({ message: "Room tidak punya materiId" });
 
-    if (!room.materiId)
-      return res.status(400).json({ message: "Room tidak punya materiId" });
-
+    // Ambil clue
     const clue = await Clue.findByPk(clueId, { transaction });
-    if (!clue)
-      return res.status(404).json({ message: "Clue tidak ditemukan" });
+    if (!clue) return res.status(404).json({ message: "Clue tidak ditemukan" });
 
-    const alreadyUsed = await DiscussionClueLog.findOne({
-      where: { roomId, clueId },
-      transaction,
-    });
-    if (alreadyUsed)
-      return res.status(400).json({
-        message: "Clue ini sudah digunakan di room ini",
-      });
+    // Cek sudah used
+    const alreadyUsed = await DiscussionClueLog.findOne({ where: { roomId, clueId }, transaction });
+    if (alreadyUsed) return res.status(400).json({ message: "Clue ini sudah digunakan di room ini" });
 
+    // Ambil members dan sync XP dulu
     const members = await UserMateriProgress.findAll({
       where: { materiId: room.materiId, roomId },
       transaction,
     });
 
-    if (!members.length)
-      return res.status(400).json({
-        message: "Tidak ada anggota di room",
-      });
+    console.log("Members found:", members.length, members.map(m => ({ id: m.userId, xp: m.xp })));
 
-    const cost = Number(clue.cost || 0);
-    for (const member of members) {
-      const userXp = await User.findByPk(member.userId, { attributes: ['xp'], transaction });
-      if (member.xp < cost || userXp.xp < cost) {
-        await transaction.rollback();
-        return res.status(400).json({
-          message: `XP anggota ${member.userId} tidak mencukupi (diperlukan ${cost} XP untuk membuka clue). Dapatkan XP tambahan di halaman Mini Game.`,
-        });
-      }
+    if (!members.length) {
+      await transaction.rollback();
+      return res.status(400).json({ message: "Tidak ada anggota di room. Pastikan sudah join room dengan benar." });
     }
 
-    // ================= POTONG XP =================
+    const cost = Number(clue.cost || 0);
+    // Cek dan potong XP dari kedua tabel
     for (const member of members) {
+      // Sync XP dulu jika perlu (pastikan up-to-date dari Users)
+      await exports.syncUserXp(member.userId, room.materiId, transaction);
+
+      // Reload member untuk dapat XP terbaru
+      await member.reload({ transaction });
+      console.log(`Checking XP for user ${member.userId}: ${member.xp} >= ${cost}`);
+
+      if (member.xp < cost) {
+        await transaction.rollback();
+        return res.status(400).json({
+          message: `XP anggota ${member.userId} tidak mencukupi (diperlukan ${cost} XP). Dapatkan XP tambahan di halaman Mini Game.`,
+        });
+      }
+
+      // Potong dari UserMateriProgress
       member.xp -= cost;
       await member.save({ transaction });
 
+      // Potong dari Users juga
       await User.update(
         { xp: User.sequelize.literal(`xp - ${cost}`) },
         { where: { id: member.userId }, transaction }
       );
     }
 
-    // ================= SIMPAN LOG CLUE =================
-    await DiscussionClueLog.create({
-      roomId,
-      clueId,
-      takenBy: userId,
-    }, { transaction });
+    // Simpan log clue
+    await DiscussionClueLog.create({ roomId, clueId, takenBy: userId }, { transaction });
 
-    // ================= SIMPAN CHAT (HISTORY) =================
-    const msg2 = await DiscussionMessage.create({
+    // Simpan chat history
+    await DiscussionMessage.create({
       roomId,
       userId,
       type: "clue",
@@ -306,16 +317,11 @@ exports.useClue = async (req, res) => {
     }, { transaction });
 
     await transaction.commit();
-    return res.json({
-      status: true,
-      message: "Clue berhasil dibuka",
-    });
+    return res.json({ status: true, message: "Clue berhasil dibuka" });
   } catch (err) {
     await transaction.rollback();
     console.error("useClue error:", err);
-    return res.status(500).json({
-      message: "Terjadi kesalahan saat membuka clue",
-    });
+    return res.status(500).json({ message: "Terjadi kesalahan saat membuka clue" });
   }
 };
 
@@ -349,53 +355,64 @@ exports.getUsedClues = async (req, res) => {
 
 /* ================= JOIN ROOM ================= */
 exports.joinRoom = async (req, res) => {
+  const transaction = await DiscussionMessage.sequelize.transaction();
   try {
     const userId = req.user.id;
     const { roomId } = req.params;
 
-    const room = await DiscussionRoom.findByPk(roomId);
+    const room = await DiscussionRoom.findByPk(roomId, { transaction });
     if (!room) {
+      await transaction.rollback();
       return res.status(404).json({ status: false, message: "Room tidak ditemukan" });
     }
 
     const materiId = room.materiId;
 
+    // Sync XP dari Users ke UserMateriProgress
+    await exports.syncUserXp(userId, materiId, transaction);
+
     let progress = await UserMateriProgress.findOne({
-      where: { userId, materiId }
+      where: { userId, materiId },
+      transaction,
     });
 
     if (!progress) {
       progress = await UserMateriProgress.create({
         userId,
         materiId,
+        xp: 0,  // Akan di-sync di atas
         completedSections: "[]",
         percent: 0,
-        roomId: null
-      });
+        roomId: null,
+      }, { transaction });
     }
 
     if (progress.roomId && progress.roomId !== parseInt(roomId)) {
+      await transaction.rollback();
       return res.status(400).json({
         status: false,
-        message: `Anda sudah join Room ${progress.roomId}. Tidak bisa join room lain.`
+        message: `Anda sudah join Room ${progress.roomId}. Tidak bisa join room lain.`,
       });
     }
 
-    await progress.update({ roomId: parseInt(roomId) });
+    await progress.update({ roomId: parseInt(roomId) }, { transaction });
 
     const alreadyMember = await RoomMember.findOne({
-      where: { room_id: roomId, user_id: userId }
+      where: { room_id: roomId, user_id: userId },
+      transaction,
     });
 
     if (!alreadyMember) {
       await RoomMember.create({
         room_id: roomId,
-        user_id: userId
-      });
+        user_id: userId,
+      }, { transaction });
     }
 
+    await transaction.commit();
     res.json({ status: true, message: "Berhasil join room", roomId });
   } catch (err) {
+    await transaction.rollback();
     console.error("joinRoom:", err);
     res.status(500).json({ status: false, message: "Server error" });
   }
@@ -674,5 +691,18 @@ exports.uploadJawaban = async (req, res) => {
       status: false,
       message: "Server error"
     });
+  }
+};
+
+exports.getSubmissionStatus = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    // Asumsi ada model Submission atau flag di Workspace/Room
+    // Jika belum ada, default false (belum submit)
+    const submitted = false;  // Ganti dengan query nyata jika ada model Submission
+    res.json({ submitted });
+  } catch (err) {
+    console.error("getSubmissionStatus:", err);
+    res.status(500).json({ message: "Server error" });
   }
 };

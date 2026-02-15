@@ -83,6 +83,20 @@ Materi.hasMany(UserMateriProgress, { foreignKey: "materiId" });
 DiscussionClueLog.belongsTo(Clue, { foreignKey: "clueId" });
 DiscussionClueLog.belongsTo(User, { foreignKey: "takenBy" });
 
+UserMateriProgress.belongsTo(DiscussionRoom, { foreignKey: "roomId", as: "room" });
+DiscussionRoom.hasMany(UserMateriProgress, { foreignKey: "roomId", as: "progresses" });
+
+DiscussionClueLog.belongsTo(DiscussionRoom, { foreignKey: "roomId", as: "room" });
+DiscussionRoom.hasMany(DiscussionClueLog, { foreignKey: "roomId", as: "clueLogs" });
+
+Workspace.belongsTo(DiscussionRoom, { foreignKey: "roomId", as: "room" });
+DiscussionRoom.hasOne(Workspace, { foreignKey: "roomId", as: "workspace" });
+
+WorkspaceAttempt.belongsTo(DiscussionRoom, { foreignKey: "roomId", as: "room" });
+DiscussionRoom.hasMany(WorkspaceAttempt, { foreignKey: "roomId", as: "attempts" });
+
+RoomTaskProgress.belongsTo(DiscussionRoom, { foreignKey: "roomId", as: "room" });
+DiscussionRoom.hasMany(RoomTaskProgress, { foreignKey: "roomId", as: "tasks" });
 module.exports = {
   User,
   Materi,
