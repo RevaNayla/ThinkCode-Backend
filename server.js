@@ -1,6 +1,6 @@
 require("dotenv").config();
 const express = require("express");
-const http = require("http");
+const https = require("https");
 const cors = require("cors");
 const path = require("path");
 const sequelize = require("./config/db");
@@ -31,7 +31,7 @@ console.log("JWT SECRET:", process.env.JWT_SECRET);
 
 const models = require("./models"); 
 const app = express();
-const server = http.createServer(app);
+const server = https.createServer(app);
 
 app.use(cors({
   origin: [
