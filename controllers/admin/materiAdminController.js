@@ -1,5 +1,6 @@
 const { Materi, MateriSection, Clue, DiscussionRoom, Upload } = require("../../models");
 const fs = require("fs");
+const path = require("path");
 
 // materi
 exports.listMateri = async (req,res) => {
@@ -29,34 +30,68 @@ exports.deleteMateri = async (req,res) => {
 };
 
 // orientasi 
-exports.getOrientasi = async (req,res)=>{
-  const step = await MateriSection.findOne({ where: { materiId: req.params.id, type: 'video', title: 'Orientasi' }});
-  return res.json(step || {});
-};
-exports.putOrientasi = async (req,res)=>{
-  const { videoUrl } = req.body;
-  let step = await MateriSection.findOne({ where: { materiId: req.params.id, type: 'video', title: 'Orientasi' }});
-  if(step){
-    await step.update({ content: videoUrl });
-  } else {
-    step = await MateriSection.create({ materiId: req.params.id, title: "Orientasi", type: "video", content: videoUrl, order: 0 });
+exports.getOrientasi = async (req, res) => {
+  try {
+    const step = await MateriSection.findOne({ where: { materiId: req.params.id, type: 'video', title: 'Orientasi' } });
+    return res.json(step || {});
+  } catch (err) {
+    console.error('Get Orientasi Error:', err);
+    res.status(500).json({ error: 'Failed to get orientasi' });
   }
-  res.json(step);
 };
-exports.uploadOrientasi = async (req,res)=>{
-  if(!req.file) return res.status(400).json({error:"No file"});
-  const url = `/uploads/orientasi/${req.file.filename}`; 
-  let step = await MateriSection.findOne({ where:{ materiId: req.params.id, type: 'video', title: 'Orientasi'  }});
-  if(step) await step.update({ content: url });
-  else step = await MateriSection.create({ materiId: req.params.id, title: "Orientasi", type: "video", content: url, order: 0 });
-  res.json(step);
-};
-exports.deleteOrientasi = async (req,res)=>{
-  let step = await MateriSection.findOne({ where:{ materiId: req.params.id, type:'video' }});
-  if(step){
-    await step.destroy();
+exports.putOrientasi = async (req, res) => {
+  try {
+    const { videoUrl } = req.body;
+    let step = await MateriSection.findOne({ where: { materiId: req.params.id, type: 'video', title: 'Orientasi' } });
+    if (step) {
+      await step.update({ content: videoUrl });
+    } else {
+      step = await MateriSection.create({ materiId: req.params.id, title: "Orientasi", type: "video", content: videoUrl, order: 0 });
+    }
+    res.json(step);
+  } catch (err) {
+    console.error('Put Orientasi Error:', err);
+    res.status(500).json({ error: 'Failed to update orientasi' });
   }
-  res.json({ success:true });
+};
+exports.uploadOrientasi = async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file" });
+
+  // Validasi tipe file (hanya video)
+  const allowedTypes = ['video/mp4', 'video/avi', 'video/mov'];
+  if (!allowedTypes.includes(req.file.mimetype)) {
+    fs.unlinkSync(req.file.path);  // Hapus file invalid
+    return res.status(400).json({ error: "Invalid file type. Only video files allowed." });
+  }
+
+  try {
+    const url = `https://thinkcode-backend-production.up.railway.app/uploads/orientasi/${req.file.filename}`;  // Force HTTPS lengkap
+    let step = await MateriSection.findOne({ where: { materiId: req.params.id, type: 'video', title: 'Orientasi' } });
+    if (step) await step.update({ content: url });
+    else step = await MateriSection.create({ materiId: req.params.id, title: "Orientasi", type: "video", content: url, order: 0 });
+    res.json(step);
+  } catch (err) {
+    console.error('Upload Orientasi Error:', err);
+    fs.unlinkSync(req.file.path);  // Cleanup jika gagal
+    res.status(500).json({ error: 'Upload failed' });
+  }
+};
+exports.deleteOrientasi = async (req, res) => {
+  try {
+    let step = await MateriSection.findOne({ where: { materiId: req.params.id, type: 'video' } });
+    if (step) {
+      // Hapus file fisik jika ada
+      if (step.content && step.content.includes('/uploads/')) {
+        const filePath = path.join(__dirname, '../../', step.content);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+      await step.destroy();
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete Orientasi Error:', err);
+    res.status(500).json({ error: 'Delete failed' });
+  }
 };
 
 // Sections
@@ -82,17 +117,24 @@ exports.deleteSection = async (req,res)=> {
   res.json({ success:true });
 };
 exports.uploadSectionImage = async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+  // Validasi tipe file (hanya gambar)
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+  if (!allowedTypes.includes(req.file.mimetype)) {
+    fs.unlinkSync(req.file.path);  // Hapus file invalid
+    return res.status(400).json({ error: "Invalid file type. Only image files allowed." });
   }
 
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const url = `${baseUrl}/uploads/orientasi/${req.file.filename}`;
-
-  res.json({ url });
+  try {
+    const url = `https://thinkcode-backend-production.up.railway.app/uploads/orientasi/${req.file.filename}`;  // Force HTTPS lengkap, konsisten
+    res.json({ url });
+  } catch (err) {
+    console.error('Upload Section Image Error:', err);
+    fs.unlinkSync(req.file.path);  // Cleanup
+    res.status(500).json({ error: 'Upload failed' });
+  }
 };
-
-
 
 // Clues
 exports.listClues = async (req,res)=> {
